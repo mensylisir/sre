@@ -69,18 +69,30 @@ log "提取到 ETCD SANs: ${ETCD_SANS}"
 
 # 5. 生成所有新叶子证书并准备 'new' 目录
 log "--- 生成所有新的叶子证书并准备 'new' 目录 ---"
+NEW_K8S_CA_BASE64=$(cat new-cas/kubernetes/ca.crt | base64 | tr -d '\n')
 for node_ip in "${ALL_NODES[@]}"; do
     hostname=${IP_TO_HOSTNAME[${node_ip}]}
     log "为节点 ${hostname} 准备 'new' 目录"
     mkdir -p "${hostname}/new/"
+
+    # --- Kubelet conf ---
+    # 复制旧配置，然后用新的 CA 数据覆盖，确保最终配置信任新 CA
     cp "${hostname}/old/kubelet.conf" "${hostname}/new/"
+    update_kubeconfig_ca "${hostname}/new/kubelet.conf" "${NEW_K8S_CA_BASE64}"
 
     if [[ " ${MASTER_NODES[@]} " =~ " ${node_ip} " ]]; then
         mkdir -p "${hostname}/new/kubernetes/pki"
+
+        # --- Master confs ---
+        # 同样复制旧配置，然后用新的 CA 数据覆盖
         cp "${hostname}/old/admin.conf" "${hostname}/new/"
         cp "${hostname}/old/controller-manager.conf" "${hostname}/new/"
         cp "${hostname}/old/scheduler.conf" "${hostname}/new/"
+        update_kubeconfig_ca "${hostname}/new/admin.conf" "${NEW_K8S_CA_BASE64}"
+        update_kubeconfig_ca "${hostname}/new/controller-manager.conf" "${NEW_K8S_CA_BASE64}"
+        update_kubeconfig_ca "${hostname}/new/scheduler.conf" "${NEW_K8S_CA_BASE64}"
 
+        # --- Certs/Keys ---
         cp new-cas/kubernetes/ca.key ${hostname}/new/kubernetes/pki/ca.key
         cp new-cas/kubernetes/ca.crt ${hostname}/new/kubernetes/pki/ca.crt
         cp new-cas/front-proxy/ca.key ${hostname}/new/kubernetes/pki/front-proxy-ca.key
