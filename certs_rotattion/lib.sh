@@ -105,3 +105,60 @@ EOF
     if [ $? -ne 0 ]; then log "错误: 签署证书 ${subject} 失败！"; exit 1; fi
     rm -f "${csr_path}" "${conf_path}" "${conf_path}.alt" "${ca_cert}.srl"
 }
+
+
+check_etcd_health() {
+    local target_host="$1"
+    local etcd_ca_path="$2"
+    local etcd_cert_path="$3"
+    local etcd_key_path="$4"
+    
+    local etcd_endpoints=""
+    for ip in "${ETCD_NODES[@]}"; do
+        etcd_endpoints+="${ip}:${ETCD_CLIENT_PORT},"
+    done
+    etcd_endpoints=${etcd_endpoints%,}
+
+    local remote_tmp_dir="/tmp/etcd_health_check_$$"
+    trap 'log "执行清理操作: rm -rf ${remote_tmp_dir} on ${target_host}"; run_remote "${target_host}" "rm -rf ${remote_tmp_dir}"; trap - RETURN EXIT INT TERM' RETURN EXIT INT TERM
+    run_remote "${target_host}" "mkdir -p ${remote_tmp_dir}"
+    sync_to_remote "${etcd_ca_path}" "${target_host}" "${remote_tmp_dir}/ca.pem"
+    sync_to_remote "${etcd_cert_path}" "${target_host}" "${remote_tmp_dir}/cert.pem"
+    sync_to_remote "${etcd_key_path}" "${target_host}" "${remote_tmp_dir}/key.pem"
+
+    log "在 ${target_host} 上检查 Etcd 集群 (${etcd_endpoints}) 的健康状态..."
+
+    local etcdctl_cmd="ETCDCTL_API=3 ${REMOTE_ETCDCTL_PATH:-etcdctl} \
+        --endpoints=${etcd_endpoints} \
+        --cacert=${remote_tmp_dir}/ca.pem \
+        --cert=${remote_tmp_dir}/cert.pem \
+        --key=${remote_tmp_dir}/key.pem \
+        endpoint health --cluster"
+
+    local health_output
+    health_output=$(ssh ${SSH_OPTS} ${SSH_USER}@${target_host} "${etcdctl_cmd}" 2>&1)
+    local exit_code=$?
+
+    if [ ${exit_code} -ne 0 ]; then
+        log "错误: etcdctl 命令执行失败！"
+        log "输出: ${health_output}"
+        exit 1
+    fi
+
+    local unhealthy_count=$(echo "${health_output}" | grep -c "is unhealthy")
+    if [ ${unhealthy_count} -gt 0 ]; then
+        log "错误: Etcd 集群中有不健康的成员！"
+        log "输出: ${health_output}"
+        exit 1
+    fi
+    log "Etcd 集群健康检查通过！所有成员均健康。"
+}
+
+extract_sans_from_cert() {
+    local cert_path=$1
+    if [ ! -f "${cert_path}" ]; then
+        log "错误: 找不到用于提取 SANs 的证书文件: ${cert_path}"
+        exit 1
+    fi
+    openssl x509 -in "${cert_path}" -noout -text | grep -A1 "Subject Alternative Name" | tail -n1 | sed 's/^[ \t]*//' | tr -d ' '
+}

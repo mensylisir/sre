@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# --- 工作区配置 ---
 # 所有生成的文件将存放在堡垒机的这个目录下
 WORKSPACE_DIR="/home/huoyun/k8s-ca-rotation"
 
@@ -22,9 +21,12 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o Connect
 # --- 远程路径配置 (根据您的环境已定制) ---
 REMOTE_K8S_CONFIG_DIR="/etc/kubernetes"
 REMOTE_ETCD_SSL_DIR="/etc/ssl/etcd/ssl"
-REMOTE_KUBELET_CONFIG_DIR="/var/lib/kubelet"
-REMOTE_KUBELET_CONF="${REMOTE_KUBELET_CONFIG_DIR}/kubelet.conf"
-REMOTE_ETCD_ENV_FILE="/etc/etcd.env" # 根据您的信息添加
+# REMOTE_KUBELET_CONFIG_DIR="/var/lib/kubelet"
+# REMOTE_KUBELET_PKI_DIR="${REMOTE_KUBELET_CONFIG_DIR}/pki"
+REMOTE_KUBELET_CONF="${REMOTE_K8S_CONFIG_DIR}/kubelet.conf"
+REMOTE_ETCD_ENV_FILE="/etc/etcd.env"
+REMOTE_ETCDCTL_PATH="/usr/local/bin/etcdctl"
+ETCD_CLIENT_PORT="2379"
 
 # --- 新证书配置 ---
 CA_EXPIRY_DAYS=36500 # 100年
