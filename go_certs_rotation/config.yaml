@@ -1,0 +1,26 @@
+workspace_dir: "/home/user/k8s-ca-rotation"
+hosts_file: "./hosts.info"
+etcd_nodes:
+  - "172.30.1.12"
+  - "172.30.1.14"
+  - "172.30.1.15"
+master_nodes:
+  - "172.30.1.12"
+  - "172.30.1.14"
+  - "172.30.1.15"
+ssh:
+  user: "root"
+  key: "/path/to/your/ssh/private_key"
+remote_paths:
+  k8s_config_dir: "/etc/kubernetes"
+  etcd_ssl_dir: "/etc/ssl/etcd/ssl"
+  kubelet_conf: "/etc/kubernetes/kubelet.conf"
+  etcd_env_file: "/etc/etcd.env"
+  etcdctl_path: "/usr/local/bin/etcdctl"
+etcd_client_port: "2379"
+new_cert_config:
+  ca_expiry_days: 3650
+  cert_expiry_days: 365
+  k8s_ca_subject: "/CN=kubernetes"
+  etcd_ca_subject: "/CN=etcd-ca"
+  front_proxy_ca_subject: "/CN=front-proxy-ca"
