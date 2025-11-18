@@ -1,0 +1,10 @@
+# Path to the kubeconfig file for accessing the Kubernetes cluster.
+kubeconfigPath: /home/user/.kube/config
+
+# SSH credentials for accessing the nodes.
+ssh:
+  user: "root"
+  keyPath: "/home/user/.ssh/id_rsa"
+
+# Local workspace directory to store backups and generated certificates.
+workspace: "./k8s_certs_rotation_workspace"
