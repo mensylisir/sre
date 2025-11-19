@@ -1,0 +1,49 @@
+package workflow
+import ("fmt"; "go_certs_rotation/pkg/k8s"; "go_certs_rotation/pkg/log"; "go_certs_rotation/pkg/task"; "io/ioutil"; "path/filepath"; "time")
+func (w *Workflow) Rotate() error {
+	log.L().Info("--- Starting Full & Precise Rotation Phase ---")
+	allNodes := append(w.topology.MasterNodes, w.topology.EtcdNodes...) // Simplified unique
+	for _, node := range allNodes {
+		l := log.L().With("node", node.Name); l.Info("--- Rotating node ---")
+		runner, err := task.NewRunner(w.dryRun, node.InternalIP, w.config.SSH.User, w.config.SSH.KeyPath); if err != nil { return err }; defer runner.Close()
+
+		nodeBundleDir := filepath.Join(w.config.Workspace, node.Name, "bundle")
+		nodeNewDir := filepath.Join(w.config.Workspace, node.Name, "new")
+
+		l.Info("[1/3] Applying bundle configuration...");
+		if err := w.uploadDirectoryContents(runner, nodeBundleDir, "/etc/kubernetes"); err != nil { return err }
+		if _, err := runner.Run("systemctl restart kubelet"); err != nil { return err }
+		if !w.dryRun { if err := k8s.WaitForNodeReady(w.clientset, node.Name, 2*time.Minute); err != nil { return err } }
+
+		l.Info("[2/3] Applying new leaf certificates...");
+		if err := w.uploadDirectoryContentsWithExclude(runner, filepath.Join(nodeNewDir, "kubernetes", "pki"), "/etc/kubernetes/pki", []string{"ca.crt", "ca.key"}); err != nil { return err }
+		if err := w.uploadDirectoryContentsWithExclude(runner, filepath.Join(nodeNewDir, "etcd-ssl"), "/etc/ssl/etcd/ssl", []string{"ca.pem", "ca-key.pem"}); err != nil { return err }
+		if _, err := runner.Run("systemctl restart kubelet"); err != nil { return err }
+		if !w.dryRun { if err := k8s.WaitForNodeReady(w.clientset, node.Name, 2*time.Minute); err != nil { return err } }
+
+		l.Info("[3/3] Applying final configuration...");
+		if err := w.uploadDirectoryContents(runner, nodeNewDir, "/etc/kubernetes"); err != nil { return err }
+		if _, err := runner.Run("systemctl restart kubelet"); err != nil { return err }
+		if !w.dryRun { if err := k8s.WaitForNodeReady(w.clientset, node.Name, 2*time.Minute); err != nil { return err } }
+	}
+	return nil
+}
+func (w *Workflow) uploadDirectoryContents(r task.Runner, srcDir, destDir string) error {
+	files, err := ioutil.ReadDir(srcDir); if err != nil { return err }
+	for _, file := range files {
+		srcPath := filepath.Join(srcDir, file.Name()); destPath := filepath.Join(destDir, file.Name())
+		if err := r.Upload(srcPath, destPath); err != nil { return err }
+	}
+	return nil
+}
+func (w *Workflow) uploadDirectoryContentsWithExclude(r task.Runner, srcDir, destDir string, exclude []string) error {
+	files, err := ioutil.ReadDir(srcDir); if err != nil { return err }
+	for _, file := range files {
+		isExcluded := false
+		for _, ex := range exclude { if file.Name() == ex { isExcluded = true; break } }
+		if isExcluded { continue }
+		srcPath := filepath.Join(srcDir, file.Name()); destPath := filepath.Join(destDir, file.Name())
+		if err := r.Upload(srcPath, destPath); err != nil { return err }
+	}
+	return nil
+}
