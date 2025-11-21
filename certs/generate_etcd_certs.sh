@@ -5,8 +5,8 @@ set -o pipefail
 
 HOSTNAMES=("etcd1" "etcd2" "etcd3")
 IPS=("10.5.114.221" "10.5.114.222" "10.5.114.223")
-MASTER_HOSTNAMES=("master1", "master2", "master3")
-MASTER_IPS=("10.5.109.1", "10.9.109.2", "10.9.109.3")
+MASTER_HOSTNAMES=("master1" "master2" "master3")
+MASTER_IPS=("10.5.109.1" "10.9.109.2" "10.9.109.3")
 FIRST_ETCD_HOSTNAME=${HOSTNAMES[0]}
 echo "================================================="
 echo "Generating certificates for the following hosts and IPs:"
@@ -98,8 +98,8 @@ EOF
 done
 for i in "${!MASTER_HOSTNAMES[@]}"; do
   hostname="${MASTER_HOSTNAMES[$i]}"
-  cp "member-${FIRST_ETCD_HOSTNAME}-key.pem" "admin-${hostname}-key.pem"
-  cp "member-${FIRST_ETCD_HOSTNAME}.pem" "admin-${hostname}.pem"
+  cp "member-${FIRST_ETCD_HOSTNAME}-key.pem" "node-${hostname}-key.pem"
+  cp "member-${FIRST_ETCD_HOSTNAME}.pem" "node-${hostname}.pem"
 done
 
 
