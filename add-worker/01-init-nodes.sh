@@ -159,20 +159,6 @@ main() {
     echo -e "${OTHER_SERVICES_INFO}";
     echo "# kubekey hosts END";
   } > ${HOSTS_FILE_CONTENT}
-  sed -i '/^$/d' ${HOSTS_FILE_CONTENT}
-  echo "  -> 新节点专用的 Hosts 内容已生成。"
-
-  warn "[任务 1.3] 在所有新节点上应用 hosts 并执行初始化..."
-  INIT_PAYLOAD=$(init_disable_prereqs; init_configure_sysctl; init_load_kernel_modules; init_finalize_settings)
-  for ip in "${NEW_WORKER_IPS[@]}"; do
-    info "----------------- 正在初始化节点: ${ip} -----------------"
-    scp ${SSH_OPTIONS} ${HOSTS_FILE_CONTENT} ${SSH_USER}@${ip}:/tmp/
-    ssh ${SSH_OPTIONS} ${SSH_USER}@${ip} "sed -i ':a;\$!{N;ba};s@# kubekey hosts BEGIN.*# kubekey hosts END@@' /etc/hosts; sed -i '/^\$/N;/\n\$/N;//D' /etc/hosts; cat /tmp/${HOSTS_FILE_CONTENT} >> /etc/hosts"
-
-    ssh ${SSH_OPTIONS} ${SSH_USER}@${ip} "${INIT_PAYLOAD}"
-  done
-
-  rm -f ${HOSTS_FILE_CONTENT}
   info "\n== 所有新节点的系统初始化已完成！接下来请执行 02-prepare-nodes.sh。 =="
 }
 

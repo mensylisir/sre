@@ -26,17 +26,31 @@ for ip in "${NEW_WORKER_IPS[@]}"; do
     warn "  -> [${ip}] 正在创建所有目标目录..."
     ssh ${SSH_OPTIONS} ${SSH_USER}@${ip} "mkdir -p /usr/bin /usr/local/bin /usr/sbin /usr/local/sbin ${SERVICE_PATH} /etc/containerd /etc/kubernetes/manifests /etc/haproxy /etc/kubekey/haproxy"
 
-    warn "  -> [${ip}] 正在从 ${EXISTING_WORKER_IP} 复制文件..."
+    warn "  -> [${ip}] 正在从 ${EXISTING_WORKER_IP} 复制文件 (经由堡垒机中转)..."
+    
+    # 创建本地临时目录用于中转
+    LOCAL_TMP_DIR="/tmp/k8s_transfer_${ip}"
+    mkdir -p "${LOCAL_TMP_DIR}"
+
     for file_path in "${FILES_TO_COPY[@]}"; do
         dir=$(dirname "${file_path}")
+        filename=$(basename "${file_path}")
         
+        # 1. 从现有节点下载到堡垒机
         if ssh ${SSH_OPTIONS} ${SSH_USER}@${EXISTING_WORKER_IP} "test -e ${file_path}"; then
-            echo "     -> 正在复制 ${file_path}..."
-            scp ${SSH_OPTIONS} ${SSH_USER}@${EXISTING_WORKER_IP}:${file_path} ${SSH_USER}@${ip}:${dir}/
+            echo "     -> [中转] 下载 ${file_path} ..."
+            scp ${SSH_OPTIONS} ${SSH_USER}@${EXISTING_WORKER_IP}:${file_path} "${LOCAL_TMP_DIR}/${filename}"
+            
+            # 2. 从堡垒机上传到新节点
+            echo "     -> [中转] 上传 ${file_path} ..."
+            scp ${SSH_OPTIONS} "${LOCAL_TMP_DIR}/${filename}" ${SSH_USER}@${ip}:${dir}/
         else
             warn "     -> 警告: 在参考节点上未找到 ${file_path}，已跳过。"
         fi
     done
+    
+    # 清理本地临时文件
+    rm -rf "${LOCAL_TMP_DIR}"
 
     warn "  -> [${ip}] 正在远程执行权限设置和服务配置..."
     ssh ${SSH_OPTIONS} ${SSH_USER}@${ip} 'bash -s' <<'EOF'

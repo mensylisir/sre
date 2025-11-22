@@ -28,6 +28,8 @@ KUBEADM_CONFIG_YAML="${KUBEADM_CONFIG_YAML}"
 echo "  -> [${ip}] 更新 kubeadm join 配置文件..."
 sed -i "s/token: .*/token: \${NEW_JOIN_TOKEN}/" \${KUBEADM_CONFIG_YAML}
 sed -i "s/tlsBootstrapToken: .*/tlsBootstrapToken: \${NEW_JOIN_TOKEN}/" \${KUBEADM_CONFIG_YAML}
+# 移除可能存在的固定节点名称，强制使用当前主机名
+sed -i "/name:/d" \${KUBEADM_CONFIG_YAML}
 
 echo "  -> [${ip}] 临时配置 hosts 用于引导..."
 # 为保证幂等性，先删除可能存在的旧条目

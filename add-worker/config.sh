@@ -23,3 +23,9 @@ SERVICE_PATH="/etc/systemd/system"
 KUBEADM_CONFIG_YAML="/etc/kubernetes/kubeadm-config.yaml"
 HAPROXY_MANIFEST="/etc/kubernetes/manifests/haproxy.yaml"
 HAPROXY_CFG="/etc/kubekey/haproxy/haproxy.cfg"
+
+# Validation
+if [ ! -f "${SSH_IDENTITY_FILE}" ]; then
+    echo -e "\033[0;31mError: SSH identity file not found at ${SSH_IDENTITY_FILE}\033[0m"
+    exit 1
+fi
